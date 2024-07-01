@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
     socklen_t len;
 
     sock = socket(PF_INET, SOCK_STREAM, 0);
+    //STREAM是面向连接的套接字
     len = sizeof(snd_buf);
     state = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (void *)&rcv_buf, sizeof(rcv_buf));
     if (state)

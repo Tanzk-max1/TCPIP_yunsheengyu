@@ -80,10 +80,11 @@ gcc gethostbyname.c -o hostname
 
 可以看出，百度有一个域名解析是 CNAME 解析的，指向了`shifen.com`，关于百度具体的解析过程。
 
-> 这一部分牵扯到了很多关于DNS解析的过程，还有 Linux 下关于域名解析的一些命令，我找了一部分资料，可以点下面的链接查看比较详细的：
+> 这一部分牵扯到了很多关于DNS解析的过程，还有 Linux 下关于域名解析的一些命令，我找了一部分资料，可以点下面的链接查看比较详细的：(链接不上的在本文末尾进行添加了)
 >
 > - [关于百度DNS的解析过程](http://zhan.renren.com/starshen?gid=3602888498023142484&checked=true)
 > - [DNS解析的过程是什么，求详细的？](https://www.zhihu.com/question/23042131/answer/66571369)
+> - [为什么域名根服务器只能有13台呢](为什么域名根服务器只能有13台呢?](https://www.zhihu.com/question/22587247/answer/1021961852)
 > - [Linux DNS 查询剖析](https://zhuanlan.zhihu.com/p/45535596)
 > - [Linux DNS查询命令](http://www.live-in.org/archives/1938.html)
 > - [Linux中DNS服务器地址查询命令nslookup使用教程](https://blog.csdn.net/shangdi1988/article/details/65713077)
@@ -158,3 +159,29 @@ gcc gethostbyaddr.c -o hostaddr
 3. **再浏览器地址输入 www.orentec.co.kr ，并整理出主页显示过程。假设浏览器访问默认 DNS 服务器中并没有关于 www.orentec.co.kr 的地址信息.**
 
    答：可以参考一下知乎回答，[在浏览器地址栏输入一个URL后回车，背后会进行哪些技术步骤？](https://www.zhihu.com/question/34873227/answer/518086565),我用我自己的理解，简单说一下，首先会去向上一级的 DNS 服务器去查询，通过这种方式逐级向上传递信息，一直到达根服务器时，它知道应该向哪个 DNS 服务器发起询问。向下传递解析请求，得到IP地址候原路返回，最后会将解析的IP地址传递到发起请求的主机。
+
+
+
+
+
+### 关于百度DNS的解析过程
+
+1.先查找本地 DNS 缓存（自己的电脑上），有则返回，没有则进入下一步
+
+2.查看本地 hosts 文件有没有相应的映射记录，有则返回，没有则进入下一步
+
+3.向本地 DNS服务器（一般都是你的网络接入服务器商提供，比如中国电信，中国移动）发送请求进行查询，本地DNS服务器收到请求后，会先查下自己的缓存记录，如果查到了直接返回就结束了，如果没有查到，本地DNS服务器就会向DNS的根域名服务器发起查询请求：请问老大，www.baidu.com 的ip是啥？
+
+4.根域名服务器收到请求后，看到这是个 .com 的域名，就回信说：这个域名是由 .com老弟管理的，你去问他好了，这是.com老弟的联系方式（ip1）。
+
+5.本地 DNS 服务器接收到回信后，照着老大哥给的联系方式（ip1），马上给 .com 这个顶级域名服务器发起请求：请问 .com 大大，www.baidu.com 的ip 是啥？
+
+6. .com 顶级域名服务器接收到请求后，看到这是 baidu.com 的域名，就回信说：这个域名是 .baidu.com老弟管理的，你就去问他就行了，这是他的联系方式（ip2）
+   本地 DNS 服务器接收到回信后，按照前辈的指引（ip2），又向 .baidu.com 这个权威域名服务器发起请求：请问 baidu.com 大大，请问 www.baidu.com 的i
+7. p是啥？
+   baidu.com 权威域名服务器接收到请求后，确认了是自己管理的域名，马上查了下自己的小本本，把 www.baidu.com 的ip告诉了 本地DNS服务器。
+   本地DNS服务器接收到回信后，非常地开心，这下总算拿到了www.baidu.com的ip了，马上把这个消息告诉了要求查询的客户（就是你的电脑）。由于这个过程比较漫长，本地DNS服务器为了节省时间，也为了尽量不去打扰各位老大哥，就把这个查询结果偷偷地记在了自己的小本本上，方便下次有人来查询时，可以快速回应。
+8. ![img](E:\学习资料\服务器\001 - C++笔记\C++学习笔记\TCPIP网络编程 - (韩-尹圣雨)\TCPIP网络源码\ch08\${photo}\watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80NTUzMjIyNw==,size_16,color_FFFFFF,t_70.png)
+
+TTL 参数可以配置缓存时间
+

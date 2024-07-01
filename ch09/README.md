@@ -44,7 +44,7 @@
 
 ```c
 #include <sys/socket.h>
-
+//获取
 int getsockopt(int sock, int level, int optname, void *optval, socklen_t *optlen);
 /*
 成功时返回 0 ，失败时返回 -1
@@ -62,6 +62,7 @@ optlen: 向第四个参数传递的缓冲大小。调用函数候，该变量中
 #include <sys/socket.h>
 
 int setsockopt(int sock, int level, int optname, const void *optval, socklen_t optlen);
+//设置
 /*
 成功时返回 0 ，失败时返回 -1
 sock: 用于更改选项套接字文件描述符
@@ -118,6 +119,28 @@ Input buffer size: 87380
 Output buffer size: 16384
 ```
 
+```c++
+//设置接收缓冲区大小（SO_RCVBUF）后，通过调用 getsockopt 获取缓冲区大小可能会发现其值比设置的值要大。
+    //这是因为操作系统在处理缓冲区大小时会应用某些内部调整和优化，
+    //内部调整机制
+    //对齐和页大小：操作系统通常会基于内存页大小进行对齐，可能会分配略大于请求的缓冲区。
+    //系统开销：操作系统可能会分配额外的空间来管理缓冲区或支持内核中的其他网络栈功能。
+//如果没有接收缓冲区的数值，那么就会返回默认的接收缓冲区大小，大概在32kB到128KB
+//本机子设置完成之后输出的正好是128KB
+```
+
+
+
+这是设置前的，在32KB附近
+
+![image-20240701212448705](E:\学习资料\服务器\001 - C++笔记\C++学习笔记\TCPIP网络编程 - (韩-尹圣雨)\TCPIP网络源码\ch09\${photo}\image-20240701212448705.png)
+
+
+
+这是设置后的
+
+![image-20240701212417459](E:\学习资料\服务器\001 - C++笔记\C++学习笔记\TCPIP网络编程 - (韩-尹圣雨)\TCPIP网络源码\ch09\${photo}\image-20240701212417459.png)
+
 可以看出本机的输入缓冲和输出缓冲大小。
 
 下面的代码演示了，通过程序设置 I/O 缓冲区的大小
@@ -127,7 +150,7 @@ Output buffer size: 16384
 编译运行：
 
 ```shell
-gcc get_buf.c -o setbuf
+gcc set_buf.c -o setbuf
 ./setbuf
 ```
 
@@ -139,6 +162,12 @@ Output buffer size: 6144
 ```
 
 输出结果和我们预想的不是很相同，缓冲大小的设置需谨慎处理，因此不会完全按照我们的要求进行。
+
+
+
+**调用 `getsockopt` 后的缓冲区大小**：实际获取的缓冲区大小翻倍，变成了 6144 字节。
+
+这是因为一些操作系统在设置缓冲区大小时，会将用户设置的大小乘以一个内部因子（通常是 2）。这是为了确保缓冲区的内存分配是对齐的并且满足内核的最小和最大缓冲区大小要求。
 
 ### 9.2 `SO_REUSEADDR`
 
@@ -185,6 +214,19 @@ setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, (void *)&option, optlen);
 ```
 
 此时，已经解决了上述问题。
+
+解决的问题：
+
+**允许地址重用**：
+
+- 启用 `SO_REUSEADDR` 选项后，即使先前使用的端口处于 `TIME_WAIT` 状态，也可以重新绑定到该端口。
+- 这在服务器程序需要频繁启动和停止时非常有用，避免因端口被占用而导致的绑定失败。
+
+**减少端口占用问题**：
+
+- 在开发和测试过程中，频繁启动和停止服务器时，如果不启用 `SO_REUSEADDR` 选项，端口可能会被占用一段时间，导致服务器无法立即重新启动。
+
+
 
 ### 9.3 `TCP_NODELAY`
 
@@ -237,9 +279,12 @@ getsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void *)&opt_val, opt_len);
    答：以下字体加粗的代表正确。
 
    1. Time-wait 状态只在服务器的套接字中发生
+      object：Time-wait 状态可以在任何一方发生，无论是客户端还是服务器，只要该方在连接断开过程中首先发送 `FIN` 消息。根据 TCP 协议规范，Time-wait 状态是由主动关闭连接的一方进入的。
    2. **断开连接的四次握手过程中，先传输 FIN 消息的套接字将进入 Time-wait 状态。**
    3. Time-wait 状态与断开连接的过程无关，而与请求连接过程中 SYN 消息的传输顺序有关
+      object：Time-wait 状态与断开连接的过程直接相关，与 SYN 消息的传输顺序无关。Time-wait 状态发生在连接断开时，而不是连接建立时。
    4. Time-wait 状态通常并非必要，应尽可能通过更改套接字可选项来防止其发生
+      object：Time-wait 状态是 TCP 协议设计中必要的一部分，确保网络中的所有数据包在连接关闭后都能正确传输和接收。虽然可以通过设置 `SO_REUSEADDR` 选项来使端口在 Time-wait 状态时重新使用，但这并不是防止 Time-wait 状态本身的发生，而是解决由于 Time-wait 状态导致的端口占用问题。
 
 2. **TCP_NODELAY 可选项与 Nagle 算法有关，可通过它禁用 Nagle 算法。请问何时应考虑禁用 Nagle 算法？结合收发数据的特性给出说明。**
 
