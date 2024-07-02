@@ -27,3 +27,12 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
+
+//简单来说就是三种触发方式不同
+// 程序开始执行 main 函数。
+// 调用 signal(SIGALRM, timeout); 注册 SIGALRM 的处理函数。
+// 调用 signal(SIGINT, keycontrol); 注册 SIGINT 的处理函数。
+// 调用 alarm(2); 设置定时器在 2 秒后发送 SIGALRM 信号。
+// 进入 for 循环并执行 puts("wait..");，立即输出 "wait.."。
+// 调用 sleep(100); 使程序进入睡眠状态，但在 2 秒后会被 SIGALRM 信号中断。
+// 2 秒后，SIGALRM 信号触发，调用 timeout 函数，输出 "time out!"，然后再次设置 alarm(2);。

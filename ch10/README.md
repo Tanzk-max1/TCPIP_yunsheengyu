@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        //调用waitpid 传递参数 WNOHANG ，这样之前有没有终止的子进程则返回0
+        //调用waitpid 传递参数 WNOHANG ，这样之前有 没有终止的子进程则返回0
         while (!waitpid(-1, &status, WNOHANG))
         {
             sleep(3);
@@ -337,7 +337,7 @@ gcc waitpid.c -o waitpid
 
 > 进程：操作系统，如果我之前创建的子进程终止，就帮我调用 zombie_handler 函数。
 >
-> 操作系统：好的，如果你的子进程终止，我舅帮你调用 zombie_handler 函数，你先把要函数要执行的语句写好。
+> 操作系统：好的，如果你的子进程终止，我就帮你调用 zombie_handler 函数，你先把要函数要执行的语句写好。
 
 上述的对话，相当于「注册信号」的过程。即进程发现自己的子进程结束时，请求操作系统调用的特定函数。该请求可以通过如下函数调用完成：
 
@@ -445,6 +445,148 @@ gcc signal.c -o signal
 调用函数的主题的确是操作系统，但是进程处于睡眠状态时无法调用函数，因此，产生信号时，为了调用信号处理器，将唤醒由于调用 sleep 函数而进入阻塞状态的进程。而且，进程一旦被唤醒，就不会再进入睡眠状态。即使还未到 sleep 中规定的时间也是如此。所以上述示例运行不到 10 秒后就会结束，连续输入 CTRL+C 可能连一秒都不到。
 
 **简言之，就是本来系统要睡眠100秒，但是到了 alarm(2) 规定的两秒之后，就会唤醒睡眠的进程，进程被唤醒了就不会再进入睡眠状态了，所以就不用等待100秒。如果把 timeout() 函数中的 alarm(2) 注释掉，就会先输出`wait...`，然后再输出`Time out!` (这时已经跳过了第一次的 sleep(100) 秒),然后就真的会睡眠100秒，因为没有再发出 alarm(2)  的信号。**
+
+代码执行顺序
+
+> 程序开始执行 `main` 函数。
+>
+> 调用 `signal(SIGALRM, timeout);` 注册 `SIGALRM` 的处理函数。
+>
+> 调用 `signal(SIGINT, keycontrol);` 注册 `SIGINT` 的处理函数。
+>
+> 调用 `alarm(2);` 设置定时器在 2 秒后发送 `SIGALRM` 信号。
+>
+> 进入 `for` 循环并执行 `puts("wait..");`，立即输出 `"wait.."`。
+>
+> 调用 `sleep(100);` 使程序进入睡眠状态，但在 2 秒后会被 `SIGALRM` 信号中断。
+>
+> 2 秒后，`SIGALRM` 信号触发，调用 `timeout` 函数，输出 `"time out!"`，然后再次设置 `alarm(2);`。
+
+### SIGALRM， SIGINT，SIGCHLD
+
+`SIGALRM`, `SIGINT`, 和 `SIGCHLD` 并不是函数，而是信号（signals）。在 Unix 和 Unix-like 操作系统中，信号是一种进程间通信的方式，用于通知进程发生了某种事件。每个信号都有特定的用途。让我们详细了解这三个信号的作用及其使用场景。
+
+#### SIGALRM (Signal Alarm)
+
+#### 作用
+
+`SIGALRM` 信号在定时器超时时发送给进程。这个信号主要用于定时操作。
+
+#### 使用场景
+- 设置一个定时器，达到时间时触发特定的操作。
+- 实现超时机制，例如网络操作、用户输入等需要在一定时间内完成的任务。
+
+#### 示例代码
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+
+void alarm_handler(int signum) {
+    printf("Alarm signal received!\n");
+}
+
+int main() {
+    signal(SIGALRM, alarm_handler);  // 设置 SIGALRM 信号的处理函数
+    alarm(3);                        // 设置定时器，3秒后发送 SIGALRM 信号
+
+    printf("Waiting for alarm...\n");
+    pause();                         // 暂停进程，等待信号
+
+    return 0;
+}
+```
+
+#### SIGINT (Signal Interrupt)
+
+#### 作用
+`SIGINT` 信号用于通知进程发生了中断操作，通常是用户通过键盘输入 `Ctrl+C` 产生的。
+
+#### 使用场景
+- 让用户能够手动中断和终止正在运行的进程。
+- 捕获中断信号，执行清理操作或保存状态。
+
+#### 示例代码
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+
+void int_handler(int signum) {
+    printf("Interrupt signal received!\n");
+    // 可以在这里进行清理操作
+    exit(0);
+}
+
+int main() {
+    signal(SIGINT, int_handler);  // 设置 SIGINT 信号的处理函数
+
+    while (1) {
+        printf("Running... Press Ctrl+C to interrupt.\n");
+        sleep(1);
+    }
+
+    return 0;
+}
+```
+
+#### SIGCHLD (Signal Child)
+
+#### 作用
+`SIGCHLD` 信号在子进程终止或停止时发送给父进程。父进程可以通过捕获这个信号来处理子进程的终止，例如回收子进程资源。
+
+#### 使用场景
+- 父进程需要监控子进程的状态变化（终止、停止）。
+- 避免子进程成为僵尸进程（zombie process）。
+
+#### 示例代码
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void chld_handler(int signum) {
+    pid_t pid;
+    int status;
+    // 回收所有终止的子进程
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("Child process %d terminated.\n", pid);
+    }
+}
+
+int main() {
+    signal(SIGCHLD, chld_handler);  // 设置 SIGCHLD 信号的处理函数
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        // 子进程
+        printf("Child process running.\n");
+        sleep(2);  // 模拟子进程执行任务
+        printf("Child process exiting.\n");
+        return 0;
+    } else {
+        // 父进程
+        printf("Parent process waiting for child to terminate.\n");
+        while (1) {
+            // 父进程可以执行其他任务，或暂停等待
+            sleep(1);
+        }
+    }
+
+    return 0;
+}
+```
+
+##### 总结
+
+- **`SIGALRM`**：用于定时器超时，常用于实现超时机制。
+- **`SIGINT`**：用于中断操作，通常由用户通过 `Ctrl+C` 触发，用于手动终止进程。
+- **`SIGCHLD`**：用于子进程状态变化，主要用于父进程监控和处理子进程的终止，避免僵尸进程。
+
+通过信号机制，进程能够响应和处理各种异步事件，增强了程序的健壮性和交互性。
+
+
 
 #### 10.3.3 利用 sigaction 函数进行信号处理
 
@@ -752,3 +894,86 @@ gcc echo_mpclient.c -o eclient
 4. **请说明进程变为僵尸进程的过程以及预防措施。**
 
    答：当一个父进程以fork()系统调用建立一个新的子进程后，核心进程就会在进程表中给这个子进程分配一个进入点，然后将相关信息存储在该进入点所对应的进程表内。这些信息中有一项是其父进程的识别码。而当这个子进程结束的时候（比如调用exit命令结束），其实他并没有真正的被销毁，而是留下一个称为僵尸进程（Zombie）的数据结构（系统调用exit的作用是使进程退出，但是也仅仅限于一个正常的进程变成了一个僵尸进程，并不能完全将其销毁）。**预防措施**：通过 wait 和 waitpid 函数加上信号函数写代码来预防。
+
+
+
+
+
+## ps：简单讲解pid_t 和fork()函数
+
+### `pid` 和 `fork` 的讲解
+
+#### `pid_t`
+
+`pid_t` 是一个类型定义，用来表示进程的 ID。它通常被用作 `fork` 函数和其他与进程管理相关的系统调用的返回类型。
+
+#### `fork`
+
+`fork` 是一个系统调用，用于创建一个新的进程。新进程称为子进程，它是由调用 `fork` 的进程（称为父进程）创建的。子进程是父进程的一个副本，几乎完全相同，除了以下几个不同点：
+
+1. `fork` 返回值不同：
+   - 在父进程中，`fork` 返回子进程的 `pid`（一个正整数）。
+   - 在子进程中，`fork` 返回 `0`。
+   - 如果创建进程失败，`fork` 返回 `-1`。
+
+2. 子进程有自己独立的进程 ID (`pid`)，以及与父进程不同的父进程 ID (`ppid`)。
+
+### 使用 `fork` 和 `pid`
+
+下面是一个使用 `fork` 的简单示例：
+
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+int main() {
+    pid_t pid;
+
+    // 创建子进程
+    pid = fork();
+
+    if (pid < 0) { // 失败
+        fprintf(stderr, "Fork Failed");
+        return 1;
+    } else if (pid == 0) { // 子进程
+        printf("I am the child process! My pid is %d\n", getpid());
+        printf("My parent's pid is %d\n", getppid());
+    } else { // 父进程
+        printf("I am the parent process! My pid is %d\n", getpid());
+        printf("My child's pid is %d\n", pid);
+        wait(NULL); // 等待子进程完成
+        printf("Child Complete\n");
+    }
+
+    return 0;
+}
+```
+
+### 解释代码
+
+1. `pid_t pid;`：
+   - 定义一个变量 `pid`，类型为 `pid_t`，用于存储 `fork` 的返回值。
+
+2. `pid = fork();`：
+   - 调用 `fork` 创建一个新进程。`fork` 返回值存储在 `pid` 中。
+
+3. `if (pid < 0) { ... }`：
+   - 如果 `pid` 小于 0，表示 `fork` 失败，打印错误信息并返回 1。
+
+4. `else if (pid == 0) { ... }`：
+   - 如果 `pid` 等于 0，表示这是在子进程中执行，打印子进程的信息，包括其 `pid` 和父进程的 `pid`。
+
+5. `else { ... }`：
+   - 如果 `pid` 大于 0，表示这是在父进程中执行，打印父进程的信息，包括其 `pid` 和子进程的 `pid`。然后调用 `wait(NULL);` 等待子进程完成，打印 "Child Complete"。
+
+### `fork` 的应用
+
+`fork` 常用于创建新进程来执行并行任务。在父进程中可以继续执行其他任务或等待子进程完成，子进程可以执行不同的代码，例如运行不同的程序 (`exec` 系列系统调用可以在子进程中使用)。
+
+### 注意事项
+
+- 子进程会继承父进程的大部分属性，例如文件描述符、环境变量等。
+- `fork` 可能会失败，例如由于系统资源不足，这时需要处理错误情况。
+- `fork` 创建的子进程是父进程的一个副本，但它们有独立的地址空间，对变量的修改不会相互影响。
+- 多次调用 `fork` 会产生多个子进程，可能会形成进程树结构。
