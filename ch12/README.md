@@ -83,7 +83,7 @@ select 函数的使用方法与一般函数的区别并不大，更准确的说�
 
 - `FD_ZERO(fd_set *fdset)`：将 fd_set 变量所指的位全部初始化成0
 - `FD_SET(int fd,fd_set *fdset)`：在参数 fdset 指向的变量中注册文件描述符 fd 的信息
-- `FD_SLR(int fd,fd_set *fdset)`：从参数 fdset 指向的变量中清除文件描述符 fd 的信息
+- `FD_CLR(int fd,fd_set *fdset)`：从参数 fdset 指向的变量中清除文件描述符 fd 的信息
 - `FD_ISSET(int fd,fd_set *fdset)`：若参数 fdset 指向的变量中包含文件描述符 fd 的信息，则返回「真」
 
 上述函数中，FD_ISSET 用于验证 select 函数的调用结果，通过下图解释这些函数的功能：
@@ -102,7 +102,7 @@ int select(int maxfd, fd_set *readset, fd_set *writeset,
            fd_set *exceptset, const struct timeval *timeout);
 /*
 成功时返回大于 0 的值，失败时返回 -1
-maxfd: 监视对象文件描述符数量
+maxfd: 监视对象文件描述符数量,因此如果最大的文件描述符值是 max_fd，那么数组的大小应该是 max_fd + 1
 readset: 将所有关注「是否存在待读取数据」的文件描述符注册到 fd_set 型变量，并传递其地址值。
 writeset: 将所有关注「是否可传输无阻塞数据」的文件描述符注册到 fd_set 型变量，并传递其地址值。
 exceptset: 将所有关注「是否发生异常」的文件描述符注册到 fd_set 型变量，并传递其地址值。
@@ -110,6 +110,26 @@ timeout: 调用 select 函数后，为防止陷入无限阻塞的状态，传递
 返回值: 发生错误时返回 -1,超时时返回0,。因发生关注的时间返回时，返回大于0的值，该值是发生事件的文件描述符数。
 */
 ```
+
+
+
+```c++
+FD_ZERO(&read_fds);
+FD_SET(fd1, &read_fds);
+FD_SET(fd2, &read_fds);
+FD_SET(fd3, &read_fds);
+
+/*
+FD_ZERO(&read_fds);：清除 read_fds 集合中的所有文件描述符，将其初始化为空。
+FD_SET(fd1, &read_fds);：将文件描述符 fd1 添加到 read_fds 集合中。
+FD_SET(fd2, &read_fds);：将文件描述符 fd2 添加到 read_fds 集合中。
+FD_SET(fd3, &read_fds);：将文件描述符 fd3 添加到 read_fds 集合中。
+*/
+```
+
+
+
+
 
 如上所述，select 函数用来验证 3 种监视的变化情况，根据监视项声明 3 个 fd_set 型变量，分别向其注册文件描述符信息，并把变量的地址值传递到上述函数的第二到第四个参数。但在此之前（调用 select 函数之前）需要决定下面两件事：
 
