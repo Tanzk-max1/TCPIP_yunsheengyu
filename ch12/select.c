@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
         }
         else
         {
+            //检查特定的文件描述符是否处于可读状态
             if (FD_ISSET(0, &temps)) //验证发生变化的值是否是标准输入端
             {
                 str_len = read(0, buf, BUF_SIZE);

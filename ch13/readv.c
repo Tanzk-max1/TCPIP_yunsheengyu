@@ -8,6 +8,7 @@ int main(int argc, char *argv[])
     char buf1[BUF_SIZE] = {
         0,
     };
+    //声明并初始化一个缓冲区 buf1，大小为 BUF_SIZE，所有元素初始化为 0。
     char buf2[BUF_SIZE] = {
         0,
     };

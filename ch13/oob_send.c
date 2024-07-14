@@ -30,6 +30,9 @@ int main(int argc, char *argv[])
     send(sock, "4", strlen("4"), MSG_OOB);
     write(sock, "567", strlen("567"));
     send(sock, "890", strlen("890"), MSG_OOB);
+    // 普通数据：按照正常的 TCP 顺序传输和处理。
+    // 带外数据：紧急数据，具有较高优先级，接收方会立即处理，不会按顺序到达。
+    // 发送的数据流是 "123"（普通数据） -> "4"（带外数据） -> "567"（普通数据） -> "890"（带外数据）
     close(sock);
     return 0;
 }
